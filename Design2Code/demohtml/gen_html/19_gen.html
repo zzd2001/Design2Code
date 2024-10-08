@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Webpage Screenshot Recreation</title>
+<style>
+        body {
+            background-color: #0000FF;
+            color: #FFFFFF;
+            font-family: "Courier New", Courier, monospace;
+            margin: 0;
+            padding: 0;
+        }
+
+        #navbar {
+            background-color: #000033;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        #navbar a {
+            text-decoration: none;
+            color: #FFFFFF;
+            padding: 10px;
+            margin: 0 5px;
+        }
+
+        #navbar a.selected {
+            background-color: #00FFFF;
+            color: #000000;
+        }
+
+        #content {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 50px;
+            gap: 50px;
+        }
+
+        .box {
+            background-color: #000066;
+            padding: 20px;
+            width: 300px;
+            box-sizing: border-box;
+        }
+
+        .box h2 {
+            color: #00FFFF;
+        }
+
+        .box p,
+        .box a {
+            color: #FFFFFF;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+<div id="content">
+<div class="box">
+<h2>Works</h2>
+<p>Violin Concerto</p>
+<p>Darwin Among The Machines</p>
+<p>Each Other</p>
+<p>Electric Dreams</p>
+<p><a href="#">View by instrumentation</a></p>
+<p><a href="#">View by year</a></p>
+<p><a href="#">View all</a></p>
+</div>
+<div class="box">
+<h2>A Polemic Overture</h2>
+<p>(2012) For 4 Horns in F, 3 Trumpets in C, 2 Tubas, 5 Tenors, 4 Violins - 5'</p>
+<p>This little overture is my parody and comment on political rhetoric.</p>
+<p>In his 1946 essay ‘<a href="#">Politics and The English Language</a>’, George Orwell condemns and explores this frivolous relationship with language.</p>
+<p>I have set an excerpt from the opening of the essay in badly translated German, courtesy of Google Translate.</p>
+<p>Dedicated to Brendan Toal, for friendship, good times and being the greatest parody-agent I know.</p>
+<p>Premièred at PLUG 2012. Conducted by Eoin Tonner.</p>
+</div>
+</div>
+<div id="navbar">
+<a href="#">Home</a>
+<a class="selected" href="#">Works</a>
+<a href="#">Bio</a>
+<a href="#">Performances</a>
+</div>
+</body>
+</html>

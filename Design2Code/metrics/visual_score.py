@@ -32,12 +32,12 @@ from colormath.color_diff import delta_e_cie2000
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
-
+# 计算两个文本块的文本相似性
 def calculate_similarity(block1, block2, max_distance=1.42):
     text_similarity = SequenceMatcher(None, block1['text'], block2['text']).ratio()
     return text_similarity
 
-
+# 调整成本矩阵以考虑上下文相似性
 def adjust_cost_for_context(cost_matrix, consecutive_bonus=1.0, window_size=20):
     if window_size <= 0:
         return cost_matrix
@@ -59,17 +59,20 @@ def adjust_cost_for_context(cost_matrix, consecutive_bonus=1.0, window_size=20):
             bonus = consecutive_bonus * sum_top_k
             adjusted_cost_matrix[i][j] += bonus
     return adjusted_cost_matrix
-
+# 创建成本矩阵，用于块匹配
 def create_cost_matrix(A, B):
+    '''
+    这个函数 create_cost_matrix 的目的是生成一个成本矩阵，用于表示块列表 A 和 B 之间的匹配成本。成本矩阵中的每个元素表示块 A[i] 和块 B[j] 之间的匹配成本。具体来说，成本矩阵中的元素是块之间相似度的负值。
+'''
     n = len(A)
     m = len(B)
     cost_matrix = np.zeros((n, m))
     for i in range(n):
         for j in range(m):
-            cost_matrix[i, j] = -calculate_similarity(A[i], B[j])
+            cost_matrix[i, j] = -calculate_similarity(A[i], B[j])  # 以两个文本块的文本相似性的负值作为成本矩阵中的元素
     return cost_matrix
 
-
+# 在图像上绘制匹配的边界框
 def draw_matched_bboxes(img1, img2, matched_bboxes):
     # Create copies of images to draw on
     img1_drawn = img1.copy()
@@ -100,16 +103,16 @@ def draw_matched_bboxes(img1, img2, matched_bboxes):
 
     return img1_drawn, img2_drawn
 
-
+# 计算两个点之间的最大距离
 def calculate_distance_max_1d(x1, y1, x2, y2):
     distance = max(abs(x2 - x1), abs(y2 - y1))
     return distance
 
-
+# 计算两个高度的比率
 def calculate_ratio(h1, h2):
     return max(h1, h2) / min(h1, h2)
 
-
+# 用于颜色相似性计算
 def rgb_to_lab(rgb):
     """
     Convert an RGB color to Lab color space.
@@ -122,7 +125,7 @@ def rgb_to_lab(rgb):
     lab_color = convert_color(rgb_color, LabColor)
     
     return lab_color
-
+# 用于颜色相似性计算
 def color_similarity_ciede2000(rgb1, rgb2):
     """
     Calculate the color similarity between two RGB colors using the CIEDE2000 formula.
@@ -143,11 +146,11 @@ def color_similarity_ciede2000(rgb1, rgb2):
     
     return similarity
 
-
+# 计算当前匹配的成本
 def calculate_current_cost(cost_matrix, row_ind, col_ind):
     return cost_matrix[row_ind, col_ind].sum()
 
-
+# 合并两个块而不进行检查
 def merge_blocks_wo_check(block1, block2):
     # Concatenate text
     merged_text = block1['text'] + " " + block2['text']
@@ -166,26 +169,29 @@ def merge_blocks_wo_check(block1, block2):
 
     return {'text': merged_text, 'bbox': merged_bbox, 'color': merged_color}
 
-
+# 计算当前匹配的成本
 def calculate_current_cost(cost_matrix, row_ind, col_ind):
     return cost_matrix[row_ind, col_ind].tolist()
 
-
+# 找到最大匹配
 def find_maximum_matching(A, B, consecutive_bonus, window_size):
-    cost_matrix = create_cost_matrix(A, B)
-    cost_matrix = adjust_cost_for_context(cost_matrix, consecutive_bonus, window_size)
-    row_ind, col_ind = linear_sum_assignment(cost_matrix)
-    current_cost = calculate_current_cost(cost_matrix, row_ind, col_ind)
-    return list(zip(row_ind, col_ind)), current_cost, cost_matrix
+    '''
+    find_maximum_matching 函数的目的是在两个块列表 A 和 B 之间找到最优匹配，同时计算匹配的成本。它使用了匈牙利算法（线性和分配算法）来解决这个匹配问题。
+    '''
+    cost_matrix = create_cost_matrix(A, B)  # 使用 create_cost_matrix 函数生成一个成本矩阵 cost_matrix，表示块列表 A 和 B 之间的匹配成本
+    cost_matrix = adjust_cost_for_context(cost_matrix, consecutive_bonus, window_size) # ？？ 使用 adjust_cost_for_context 函数根据 consecutive_bonus 和 window_size 调整成本矩阵。这可能用于奖励连续匹配的块或在某些范围内调整成本。
+    row_ind, col_ind = linear_sum_assignment(cost_matrix)   # ？？ 使用 linear_sum_assignment 函数（匈牙利算法）在调整后的成本矩阵上找到最优匹配。该函数返回行索引 row_ind 和列索引 col_ind，表示最优匹配。
+    current_cost = calculate_current_cost(cost_matrix, row_ind, col_ind)  # 使用 calculate_current_cost 函数计算当前匹配的总成本。
+    return list(zip(row_ind, col_ind)), current_cost, cost_matrix  # 返回最优匹配 list(zip(row_ind, col_ind))，当前成本 current_cost，以及成本矩阵 cost_matrix。
 
-
+# 用于块合并
 def remove_indices(lst, indices):
     for index in sorted(indices, reverse=True):
         if index < len(lst):
             lst.pop(index)
     return lst
 
-
+# 用于块合并
 def merge_blocks_by_list(blocks, merge_list):
     pop_list = []
     while True:
@@ -207,12 +213,12 @@ def merge_blocks_by_list(blocks, merge_list):
                     new_merge_list.append(merge_list[k])
             merge_list = new_merge_list
 
-
+# 打印匹配结果
 def print_matching(matching, blocks1, blocks2, cost_matrix):
     for i, j in matching:
         print(f"{blocks1[i]} matched with {blocks2[j]}, cost {cost_matrix[i][j]}")
 
-
+# 计算两个列表的均值差异
 def difference_of_means(list1, list2):
     counter1 = Counter(list1)
     counter2 = Counter(list2)
@@ -236,11 +242,14 @@ def difference_of_means(list1, list2):
     else:
         return mean_list1 - mean_list2
 
-
+# 找到可能的合并，通过这种方式，函数可以找到两个块列表之间的最佳匹配，同时尽可能减少块的数量
 def find_possible_merge(A, B, consecutive_bonus, window_size, debug=False):
+    '''
+    这个函数通过迭代优化的方法，不断尝试合并相邻的块，并评估匹配成本的变化，直到无法进一步优化为止。它使用了多个辅助函数来计算匹配、合并块和评估成本变化。通过这种方式，函数可以找到两个块列表之间的最佳匹配，同时尽可能减少块的数量。
+    '''
     merge_bonus = 0.0
     merge_windows = 1
-
+    # 用于根据 diff（匹配成本的变化）对合并列表进行排序
     def sortFn(value):
         return value[2]
 
@@ -248,33 +257,33 @@ def find_possible_merge(A, B, consecutive_bonus, window_size, debug=False):
         A_changed = False
         B_changed = False
 
-        matching, current_cost, cost_matrix = find_maximum_matching(A, B, merge_bonus, merge_windows)
+        matching, current_cost, cost_matrix = find_maximum_matching(A, B, merge_bonus, merge_windows)  # 计算当前匹配和成本
         if debug:
             print("Current cost of the solution:", current_cost)
             print_matching(matching, A, B, cost_matrix)
     
-        if len(A) >= 2:
+        if len(A) >= 2:  # 如果 A 的长度大于等于 2，尝试合并相邻的块
             merge_list = []
             for i in range(len(A) - 1):
-                new_A = deepcopy(A)
-                new_A[i] = merge_blocks_wo_check(new_A[i], new_A[i + 1])
+                new_A = deepcopy(A)  # deepcopy 是 Python 标准库 copy 模块中的一个函数，用于创建一个对象的深拷贝
+                new_A[i] = merge_blocks_wo_check(new_A[i], new_A[i + 1])  # 返回{'text': merged_text, 'bbox': merged_bbox, 'color': merged_color}
                 new_A.pop(i + 1)
     
                 updated_matching, updated_cost, cost_matrix = find_maximum_matching(new_A, B, merge_bonus, merge_windows)
-                diff = difference_of_means(current_cost, updated_cost)
+                diff = difference_of_means(current_cost, updated_cost)  # 计算成本变化 diff，如果成本变化大于 0.05（成本下降了），则将这对块添加到 merge_list 中
                 if  diff > 0.05:
                     merge_list.append([i, i + 1, diff])
                     if debug:
                         print(new_A[i]['text'], diff)
 
-            merge_list.sort(key=sortFn, reverse=True)
+            merge_list.sort(key=sortFn, reverse=True)   # 对 merge_list 按 diff 进行排序，并合并 A 中的块
             if len(merge_list) > 0:
                 A_changed = True
                 A = merge_blocks_by_list(A, merge_list)
-                matching, current_cost, cost_matrix = find_maximum_matching(A, B, merge_bonus, merge_windows)
+                matching, current_cost, cost_matrix = find_maximum_matching(A, B, merge_bonus, merge_windows)  # 重新计算优化之后得到的新的A和之前的B的匹配
                 if debug:
                     print("Cost after optimization A:", current_cost)
-
+        #  与A的优化合并同理
         if len(B) >= 2:
             merge_list = []
             for i in range(len(B) - 1):
@@ -296,14 +305,17 @@ def find_possible_merge(A, B, consecutive_bonus, window_size, debug=False):
                 matching, current_cost, cost_matrix = find_maximum_matching(A, B, merge_bonus, merge_windows)
                 if debug:
                     print("Cost after optimization B:", current_cost)
-
+        # 如果 A 和 B 都没有发生变化，退出循环，无需在进行优化了
         if not A_changed and not B_changed:
             break
-    matching, _, _ = find_maximum_matching(A, B, consecutive_bonus, window_size)
+    matching, _, _ = find_maximum_matching(A, B, consecutive_bonus, window_size)  # 返回优化后的块列表 A 和 B 以及最终匹配 matching
     return A, B, matching
 
-
+# 按边界框合并块
 def merge_blocks_by_bbox(blocks):
+    '''
+    函数的目的是合并具有相同边界框（bounding box）的块。它遍历输入的块列表，将具有相同边界框的块合并为一个块，并将合并后的块返回。
+    '''
     merged_blocks = {}
     
     # Traverse and merge blocks
@@ -320,7 +332,7 @@ def merge_blocks_by_bbox(blocks):
 
     return list(merged_blocks.values())
 
-
+# 使用图像修复技术掩盖边界框
 def mask_bounding_boxes_with_inpainting(image, bounding_boxes):
     # Convert PIL image to OpenCV format
     image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -347,7 +359,7 @@ def mask_bounding_boxes_with_inpainting(image, bounding_boxes):
 
     return inpainted_image_pil
 
-
+# 重新缩放图像并掩盖块
 def rescale_and_mask(image_path, blocks):
     # Load the image
     with Image.open(image_path) as img:
@@ -370,7 +382,7 @@ def rescale_and_mask(image_path, blocks):
 
         return img_resized
 
-
+# 计算两个图像块的CLIP相似性
 def calculate_clip_similarity_with_blocks(image_path1, image_path2, blocks1, blocks2):
     # Load and preprocess images
     image1 = preprocess(rescale_and_mask(image_path1, [block['bbox'] for block in blocks1])).unsqueeze(0).to(device)
@@ -390,7 +402,7 @@ def calculate_clip_similarity_with_blocks(image_path1, image_path2, blocks1, blo
 
     return similarity
 
-
+# 截断重复的HTML元素
 def truncate_repeated_html_elements(soup, max_count=50):
     content_counts = {}
 
@@ -410,7 +422,7 @@ def truncate_repeated_html_elements(soup, max_count=50):
 
     return str(soup)
 
-
+# 生成简单的HTML文件
 def make_html(filename):
     with open(filename, 'r') as file:
         content = file.read()
@@ -420,7 +432,7 @@ def make_html(filename):
         with open(filename, 'w') as file:
             file.write(new_content)
 
-
+# 预处理HTML文件
 def pre_process(html_file):
     check_repetitive_content(html_file)
     make_html(html_file)
@@ -430,48 +442,64 @@ def pre_process(html_file):
     with open(html_file, 'w') as file:
         file.write(soup_str)
 
-
+# 是主要的评估函数，用于比较多个预测HTML文件和一个原始HTML文件之间的相似性
 def visual_eval_v3_multi(input_list, debug=False):
+    # input_list:包含预测HTML文件列表和一个原始HTML文件
+    # 初始化和预处理
+    # 从 input_list 中提取预测HTML文件列表和原始HTML文件。
+    # 生成对应的PNG图像文件名列表。 
     predict_html_list, original_html = input_list[0], input_list[1]
-    predict_img_list = [html.replace(".html", ".png") for html in predict_html_list]
+    predict_img_list = [html.replace(".html", ".png") for html in predict_html_list]  # 生成对应的PNG图像文件名列表
     # try:
+    # 处理预测HTML文件
+    # 对每个预测HTML文件进行预处理，修复HTML语法错误。
+    # 使用系统命令生成PNG图像。
+    # 使用 get_blocks_ocr_free 函数从图像中获取块信息，并存储在 predict_blocks_list 中。
     predict_blocks_list = []
     for predict_html in predict_html_list:
         predict_img = predict_html.replace(".html", ".png")
         # This will help fix some html syntax error
         pre_process(predict_html)
-        os.system(f"python3 metrics/screenshot_single.py --html {predict_html} --png {predict_img}")
+        # os.system(f"python3 metrics/screenshot_single.py --html {predict_html} --png {predict_img}")
         predict_blocks = get_blocks_ocr_free(predict_img)
         predict_blocks_list.append(predict_blocks)
-
+    # 处理原始HTML文件
+    # 生成原始HTML文件对应的PNG图像。
+    # 使用 get_blocks_ocr_free 函数从图像中获取块信息，并使用 merge_blocks_by_bbox 函数合并块。
     original_img = original_html.replace(".html", ".png")
     os.system(f"python3 metrics/screenshot_single.py --html {original_html} --png {original_img}")
     original_blocks = get_blocks_ocr_free(original_img)
     original_blocks = merge_blocks_by_bbox(original_blocks)
 
     # Consider context similarity for block matching
+    # 块匹配和相似性计算
+    # 设置连续奖励和窗口大小参数。
+    # 初始化返回分数列表。
     consecutive_bonus, window_size = 0.1, 1
 
     return_score_list = []
-
+    # 对每个预测块进行处理。如果没有检测到块，计算CLIP相似性分数并继续下一个块。
     for k, predict_blocks in enumerate(predict_blocks_list):
-         if len(predict_blocks) == 0:
+        if len(predict_blocks) == 0:
                 print("[Warning] No detected blocks in: ", predict_img_list[k])
                 final_clip_score = calculate_clip_similarity_with_blocks(predict_img_list[k], original_img, predict_blocks, original_blocks)
                 return_score_list.append([0.0, 0.2 * final_clip_score, (0.0, 0.0, 0.0, 0.0, final_clip_score)])
                 continue
-            elif len(original_blocks) == 0:
+        elif len(original_blocks) == 0:
                 print("[Warning] No detected blocks in: ", original_img)
                 final_clip_score = calculate_clip_similarity_with_blocks(predict_img_list[k], original_img, predict_blocks, original_blocks)
                 return_score_list.append([0.0, 0.2 * final_clip_score, (0.0, 0.0, 0.0, 0.0, final_clip_score)])
                 continue
-
+        # 块合并和匹配
+        # 合并预测块。
+        # 使用 find_possible_merge 函数找到可能的块合并和匹配。
+        # 过滤掉文本相似性低于0.5的匹配。
         if debug:
             print(predict_blocks)
             print(original_blocks)
     
-        predict_blocks = merge_blocks_by_bbox(predict_blocks)
-        predict_blocks_m, original_blocks_m, matching = find_possible_merge(predict_blocks, deepcopy(original_blocks), consecutive_bonus, window_size, debug=debug)
+        predict_blocks = merge_blocks_by_bbox(predict_blocks)  # 合并具有相同边界框（bounding box）的块
+        predict_blocks_m, original_blocks_m, matching = find_possible_merge(predict_blocks, deepcopy(original_blocks), consecutive_bonus, window_size, debug=debug)  # ！??
         
         filtered_matching = []
         for i, j in matching:
@@ -481,7 +509,7 @@ def visual_eval_v3_multi(input_list, debug=False):
                 continue
             filtered_matching.append([i, j, text_similarity])
         matching = filtered_matching
-
+        # 计算未匹配的面积
         indices1 = [item[0] for item in matching]
         indices2 = [item[1] for item in matching]
 
@@ -501,7 +529,9 @@ def visual_eval_v3_multi(input_list, debug=False):
             if j not in indices2:
                 unmatched_area_2 += original_blocks_m[j]['bbox'][2] * original_blocks_m[j]['bbox'][3]
         sum_areas.append(unmatched_area_1 + unmatched_area_2)
-    
+        # 计算匹配块的相似性
+        # 计算匹配块的面积、位置相似性、颜色相似性等。
+        # 将匹配块的信息存储在各自的列表中
         for i, j, text_similarity in matching:
             sum_block_area = predict_blocks_m[i]['bbox'][2] * predict_blocks_m[i]['bbox'][3] + original_blocks_m[j]['bbox'][2] * original_blocks_m[j]['bbox'][3]
 
@@ -548,7 +578,9 @@ def visual_eval_v3_multi(input_list, debug=False):
             plt.axis('off')
             plt.show()
         # """
-
+        # 计算最终得分
+        # 计算最终得分，包括尺寸得分、文本匹配得分、位置得分、颜色得分和CLIP相似性得分。
+        # 将最终得分存储在返回列表中
         if len(matched_areas) > 0:
             sum_sum_areas = np.sum(sum_areas)
     
@@ -570,5 +602,24 @@ def visual_eval_v3_multi(input_list, debug=False):
     #     return [[0.0, 0.0, (0.0, 0.0, 0.0, 0.0, 0.0)] for _ in range(len(predict_html_list))]
 
 
-# if __name__ == "__main__":
-#     visual_eval_v3_multi([], debug=False)
+
+if __name__ == "__main__":
+    import os
+    from pathlib import Path
+
+    # 修改原始页面路径和生成页面路径
+    original_html_path = "/root/Design2Code/Design2Code/demohtml/original_html/19.html"
+    generated_html_path = "/root/Design2Code/Design2Code/demohtml/gen_html/19_gen.html"
+
+    # 将路径添加到列表中，作为输入参数
+    input_list = [[generated_html_path], original_html_path]
+
+    # 调用visual_eval_v3_multi函数进行相似度计算
+    scores = visual_eval_v3_multi(input_list, debug=True)
+
+    # 输出相似度得分
+    print("Similarity Scores:", scores)
+    visual_eval_v3_multi([], debug=True)
+
+
+
